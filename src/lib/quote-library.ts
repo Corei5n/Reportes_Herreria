@@ -1,4 +1,5 @@
 import { createDefaultQuote } from "@/lib/defaults";
+import { generateQuoteFolio } from "@/lib/folio";
 import { nanoid } from "@/lib/nanoid";
 import { readJson, writeJson, removeKey } from "@/lib/storage";
 import { type QuoteFormValues } from "@/lib/quote-types";
@@ -51,7 +52,10 @@ function createRecord(values?: QuoteFormValues, title?: string): SavedQuoteRecor
   return {
     id: nanoid(),
     title: title?.trim() || quoteTitleFromValues(resolvedValues),
-    values: resolvedValues,
+    values: {
+      ...resolvedValues,
+      numeroCotizacion: generateQuoteFolio()
+    },
     createdAt: timestamp,
     updatedAt: timestamp
   };

@@ -1,15 +1,15 @@
 import { type QuoteFormValues } from "./quote-types";
 import { nanoid } from "./nanoid";
-
-const today = new Date();
+import { generateQuoteFolio } from "./folio";
 
 export function createDefaultQuote(): QuoteFormValues {
+  const today = new Date();
   return {
     cliente: "",
     empresa: "",
     telefono: "",
     fecha: today.toISOString().slice(0, 10),
-    numeroCotizacion: `COT-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
+    numeroCotizacion: generateQuoteFolio(today),
     nombreProyecto: "",
     descripcionProyecto: "",
     materiales: [

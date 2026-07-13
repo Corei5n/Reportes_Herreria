@@ -24,31 +24,21 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { createDefaultQuote } from "@/lib/defaults";
 import { calculateTotals } from "@/lib/calc";
-import { formatCurrency, formatDate } from "@/lib/currency";
+import { formatCurrency } from "@/lib/currency";
 import { quoteSchema, type QuoteFormValues } from "@/lib/quote-types";
 import { useTheme } from "@/hooks/useTheme";
-import { useQuotePersistence } from "@/hooks/useQuotePersistence";
+import { useQuoteLibrary } from "@/hooks/useQuoteLibrary";
 import { useDebouncedEffect } from "@/hooks/useDebouncedEffect";
 import { buildQuotePdf } from "@/pdf/buildQuotePdf";
 import { LogoPreview } from "@/components/LogoPreview";
 import { RowsEditor } from "@/components/quote/RowsEditor";
 import { SummaryCard } from "@/components/SummaryCard";
 import { PdfPreviewDialog } from "@/components/PdfPreviewDialog";
+import { QuoteLibraryPanel } from "@/components/QuoteLibraryPanel";
 import { nanoid } from "@/lib/nanoid";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { InstallPrompt } from "@/components/InstallPrompt";
-
-function normalizeDefaults(values: QuoteFormValues): QuoteFormValues {
-  return {
-    ...values,
-    empresa: values.empresa ?? "",
-    notas: values.notas ?? "",
-    logoDataUrl: values.logoDataUrl ?? "",
-    companiaNombre: values.companiaNombre ?? "",
-    companiaTelefono: values.companiaTelefono ?? "",
-    companiaDireccion: values.companiaDireccion ?? ""
-  };
-}
+import { normalizeQuoteValues } from "@/lib/quote-library";
 
 function findFirstErrorPath(value: unknown, prefix = ""): string | null {
   if (!value || typeof value !== "object") return null;
@@ -69,21 +59,29 @@ function findFirstErrorPath(value: unknown, prefix = ""): string | null {
 export default function App() {
   const { theme, isDark, toggleTheme } = useTheme();
   const { installed, ios, canPromptInstall, promptInstall } = useInstallPrompt();
-  const { initialValues, saveDraft, clearDraft, lastSavedAt } = useQuotePersistence();
+  const {
+    quotes,
+    activeQuote,
+    setActiveQuoteId,
+    saveActiveQuote,
+    createQuote,
+    duplicateQuote,
+    deleteQuote
+  } = useQuoteLibrary();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [status, setStatus] = useState<string>("Listo");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const form = useForm<QuoteFormValues>({
     resolver: zodResolver(quoteSchema) as Resolver<QuoteFormValues>,
-    defaultValues: normalizeDefaults(initialValues),
+    defaultValues: normalizeQuoteValues(activeQuote?.values ?? createDefaultQuote()),
     mode: "onChange"
   });
 
   const { register, control, watch, reset, setValue, formState, trigger, getValues, setFocus } = form;
   const { errors, isDirty, isValid } = formState;
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const materialesArray = useFieldArray({ control, name: "materiales", keyName: "key" });
   const manoDeObraArray = useFieldArray({ control, name: "manoDeObra", keyName: "key" });
@@ -92,20 +90,26 @@ export default function App() {
   const values = watch();
   const totals = useMemo(() => calculateTotals(values), [values]);
 
+  const syncCurrentQuote = () => {
+    saveActiveQuote(values);
+  };
+
   useDebouncedEffect(
     () => {
       if (isDirty) {
-        saveDraft(values);
-        setStatus("Borrador guardado");
+        saveActiveQuote(values);
+        setStatus("Cotización guardada");
       }
     },
-    [values, isDirty],
+    [values, isDirty, saveActiveQuote],
     450
   );
 
   useEffect(() => {
-    reset(normalizeDefaults(initialValues));
-  }, [initialValues, reset]);
+    if (activeQuote) {
+      reset(normalizeQuoteValues(activeQuote.values));
+    }
+  }, [activeQuote, reset]);
 
   useEffect(() => {
     if (theme === "dark") {
@@ -174,11 +178,17 @@ export default function App() {
     if (window.confirm("¿Eliminar este gasto adicional?")) gastosArray.remove(index);
   };
 
+  const openQuote = (id: string) => {
+    syncCurrentQuote();
+    setActiveQuoteId(id);
+    setStatus("Cotización abierta");
+  };
+
   const duplicateCurrentQuote = () => {
-    const copied = JSON.parse(JSON.stringify(values)) as QuoteFormValues;
-    copied.numeroCotizacion = `${copied.numeroCotizacion}-COPIA`;
-    reset(copied);
-    setStatus("Cotización duplicada");
+    syncCurrentQuote();
+    const duplicatedId = duplicateQuote(values);
+    setActiveQuoteId(duplicatedId);
+    setStatus("Versión duplicada y abierta");
   };
 
   const exportJson = () => {
@@ -198,7 +208,9 @@ export default function App() {
       alert("El archivo JSON no es compatible con esta cotización.");
       return;
     }
-    reset(normalizeDefaults(parsed.data));
+    syncCurrentQuote();
+    const importedId = createQuote(parsed.data);
+    setActiveQuoteId(importedId);
     setStatus("Cotización importada");
   };
 
@@ -220,6 +232,7 @@ export default function App() {
     setIsGeneratingPdf(true);
     try {
       const data = getValues();
+      syncCurrentQuote();
       setStatus("Generando PDF...");
       const blob = await createPdfBlob(data);
 
@@ -247,12 +260,31 @@ export default function App() {
     }
   };
 
+  const createNewQuote = () => {
+    syncCurrentQuote();
+    const newQuoteId = createQuote(createDefaultQuote());
+    setActiveQuoteId(newQuoteId);
+    setStatus("Nueva cotización lista");
+  };
+
   const newQuotation = () => {
-    if (window.confirm("¿Crear una nueva cotización? Se borrará el borrador actual en este dispositivo.")) {
-      clearDraft();
-      reset(createDefaultQuote());
-      setStatus("Nueva cotización lista");
+    if (window.confirm("¿Crear una nueva cotización? Se guardará la actual y abrirás una nueva.")) {
+      createNewQuote();
     }
+  };
+
+  const deleteQuoteById = (id: string) => {
+    if (window.confirm("¿Eliminar esta cotización guardada?")) {
+      if (activeQuote?.id === id) {
+        syncCurrentQuote();
+      }
+      deleteQuote(id);
+      setStatus("Cotización eliminada");
+    }
+  };
+
+  const openPreview = async () => {
+    await generatePdf(false, true);
   };
 
   return (
@@ -270,7 +302,7 @@ export default function App() {
                 Diseñado para iPhone, Android y escritorio. Tus datos se guardan localmente y el PDF se genera en tu dispositivo.
               </p>
             </div>
-          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" onClick={toggleTheme} className="rounded-2xl">
                 {isDark ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
                 {isDark ? "Tema claro" : "Tema oscuro"}
@@ -308,7 +340,9 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <span>{status}</span>
             <span>•</span>
-            <span>Guardado: {lastSavedAt ? formatDate(lastSavedAt) : "aún no"}</span>
+            <span>{quotes.length} cotizaciones guardadas</span>
+            <span>•</span>
+            <span>Activa: {activeQuote?.title ?? "Sin título"}</span>
             <span>•</span>
             <span>{isValid ? "Formulario listo" : "Revisa los campos requeridos"}</span>
           </div>
@@ -318,6 +352,22 @@ export default function App() {
 
       <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 pb-28 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
         <div className="space-y-6">
+          <QuoteLibraryPanel
+            quotes={quotes}
+            activeQuoteId={activeQuote?.id ?? ""}
+            onSelect={openQuote}
+            onNew={createNewQuote}
+            onDuplicate={(id) => {
+              const selectedQuote = quotes.find((quote) => quote.id === id);
+              if (!selectedQuote) return;
+              syncCurrentQuote();
+              const duplicatedId = duplicateQuote(selectedQuote.values);
+              setActiveQuoteId(duplicatedId);
+              setStatus("Versión duplicada y abierta");
+            }}
+            onDelete={deleteQuoteById}
+          />
+
           <Section title="Información del cliente" description="Datos de contacto y referencia de la cotización." defaultOpen>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Cliente" error={errors.cliente?.message?.toString()} required>
@@ -439,9 +489,9 @@ export default function App() {
                 <FileDown className="h-4 w-4" />
                 {isGeneratingPdf ? "Generando..." : "Generar PDF"}
               </Button>
-              <Button type="button" size="lg" variant="outline" onClick={() => void generatePdf(true, false)} className="rounded-2xl" disabled={isGeneratingPdf}>
+              <Button type="button" size="lg" variant="outline" onClick={() => void openPreview()} className="rounded-2xl" disabled={isGeneratingPdf}>
                 <Download className="h-4 w-4" />
-                Solo descargar
+                Vista previa
               </Button>
               <Button type="button" size="lg" variant="secondary" onClick={() => window.print()} className="rounded-2xl">
                 <Save className="h-4 w-4" />
@@ -490,7 +540,7 @@ export default function App() {
             <p className="text-xl font-bold">{formatCurrency(totals.precioFinal)}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="rounded-2xl" onClick={() => void generatePdf(false)} disabled={isGeneratingPdf}>
+            <Button variant="outline" className="rounded-2xl" onClick={() => void openPreview()} disabled={isGeneratingPdf}>
               <ChevronDown className="h-4 w-4 rotate-180" />
               Vista previa
             </Button>

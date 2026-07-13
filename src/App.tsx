@@ -74,6 +74,7 @@ export default function App() {
   const [status, setStatus] = useState<string>("Listo");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const lastLoadedQuoteId = useRef<string | null>(null);
 
   const form = useForm<QuoteFormValues>({
     resolver: zodResolver(quoteSchema) as Resolver<QuoteFormValues>,
@@ -107,10 +108,12 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (activeQuote) {
-      reset(normalizeQuoteValues(activeQuote.values));
-    }
-  }, [activeQuote, reset]);
+    if (!activeQuote) return;
+    if (lastLoadedQuoteId.current === activeQuote.id) return;
+
+    lastLoadedQuoteId.current = activeQuote.id;
+    reset(normalizeQuoteValues(activeQuote.values));
+  }, [activeQuote?.id, reset]);
 
   useEffect(() => {
     if (theme === "dark") {

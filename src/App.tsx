@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Controller, useFieldArray, useForm, type Resolver } from "react-hook-form";
+import { Controller, useFieldArray, useForm, type Path, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Calculator,
@@ -50,6 +50,22 @@ function normalizeDefaults(values: QuoteFormValues): QuoteFormValues {
   };
 }
 
+function findFirstErrorPath(value: unknown, prefix = ""): string | null {
+  if (!value || typeof value !== "object") return null;
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  for (const [key, child] of entries) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (child && typeof child === "object" && "message" in child) {
+      return path;
+    }
+    const nested = findFirstErrorPath(child, path);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
 export default function App() {
   const { theme, isDark, toggleTheme } = useTheme();
   const { installed, ios, canPromptInstall, promptInstall } = useInstallPrompt();
@@ -65,7 +81,7 @@ export default function App() {
     mode: "onChange"
   });
 
-  const { register, control, watch, reset, setValue, formState, trigger, getValues } = form;
+  const { register, control, watch, reset, setValue, formState, trigger, getValues, setFocus } = form;
   const { errors, isDirty, isValid } = formState;
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -189,7 +205,15 @@ export default function App() {
   const generatePdf = async (download = true, preview = true) => {
     const isFormValid = await trigger();
     if (!isFormValid) {
-      setStatus("Faltan datos obligatorios. Revisa los campos marcados en rojo.");
+      const firstErrorPath = findFirstErrorPath(formState.errors);
+      if (firstErrorPath) {
+        setFocus(firstErrorPath as Path<QuoteFormValues>);
+        window.requestAnimationFrame(() => {
+          const element = document.querySelector<HTMLElement>(`[name="${firstErrorPath}"]`);
+          element?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
+      setStatus("Faltan datos obligatorios. Te llevé al campo pendiente.");
       return;
     }
 
@@ -233,7 +257,7 @@ export default function App() {
 
   return (
     <div className="min-h-full">
-      <header className="safe-top sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
+      <header className="safe-top border-b border-border/60 bg-background/80 backdrop-blur-xl lg:sticky lg:top-0 lg:z-30">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-1">

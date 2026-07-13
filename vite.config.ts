@@ -4,7 +4,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
-  base: "./",
+  base: process.env.GITHUB_ACTIONS ? "/Reportes_Herreria/" : "./",
   plugins: [
     react(),
     VitePWA({

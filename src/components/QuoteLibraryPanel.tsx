@@ -31,8 +31,8 @@ export function QuoteLibraryPanel({ quotes, activeQuoteId, onSelect, onNew, onDu
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-2 xl:grid-cols-3 md:overflow-visible">
+      <CardContent className="max-h-[420px] overflow-hidden md:max-h-[460px]">
+        <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:max-h-[420px] md:grid-cols-2 md:overflow-y-auto md:pr-1 xl:grid-cols-3">
           {quotes.map((quote) => {
             const active = quote.id === activeQuoteId;
             return (

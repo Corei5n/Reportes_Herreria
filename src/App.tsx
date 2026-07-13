@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { createDefaultQuote } from "@/lib/defaults";
 import { calculateTotals } from "@/lib/calc";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, formatDate } from "@/lib/currency";
 import { quoteSchema, type QuoteFormValues } from "@/lib/quote-types";
 import { useTheme } from "@/hooks/useTheme";
 import { useQuoteLibrary } from "@/hooks/useQuoteLibrary";
@@ -70,6 +70,7 @@ export default function App() {
   } = useQuoteLibrary();
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [quoteLibraryOpen, setQuoteLibraryOpen] = useState(false);
   const [status, setStatus] = useState<string>("Listo");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -124,6 +125,13 @@ export default function App() {
       if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     };
   }, [pdfUrl]);
+
+  useEffect(() => {
+    document.body.style.overflow = quoteLibraryOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [quoteLibraryOpen]);
 
   const createPdfBlob = async (data: QuoteFormValues) => buildQuotePdf(data);
 
@@ -344,29 +352,38 @@ export default function App() {
             <span>•</span>
             <span>Activa: {activeQuote?.title ?? "Sin título"}</span>
             <span>•</span>
+            <span>Actualizada: {activeQuote ? formatDate(activeQuote.updatedAt) : "sin fecha"}</span>
+            <span>•</span>
             <span>{isValid ? "Formulario listo" : "Revisa los campos requeridos"}</span>
           </div>
-          <InstallPrompt installed={installed} ios={ios} canPromptInstall={canPromptInstall} onInstall={promptInstall} />
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" className="rounded-2xl" onClick={() => setQuoteLibraryOpen(true)}>
+              <FileJson className="h-4 w-4" />
+              Cotizaciones guardadas
+            </Button>
+            <InstallPrompt installed={installed} ios={ios} canPromptInstall={canPromptInstall} onInstall={promptInstall} />
+          </div>
         </div>
       </header>
 
       <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 pb-28 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
         <div className="space-y-6">
-          <QuoteLibraryPanel
-            quotes={quotes}
-            activeQuoteId={activeQuote?.id ?? ""}
-            onSelect={openQuote}
-            onNew={createNewQuote}
-            onDuplicate={(id) => {
-              const selectedQuote = quotes.find((quote) => quote.id === id);
-              if (!selectedQuote) return;
-              syncCurrentQuote();
-              const duplicatedId = duplicateQuote(selectedQuote.values);
-              setActiveQuoteId(duplicatedId);
-              setStatus("Versión duplicada y abierta");
-            }}
-            onDelete={deleteQuoteById}
-          />
+          <Card className="overflow-hidden">
+            <CardHeader className="space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-base">Versión activa</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {activeQuote?.title ?? "Sin título"} · Actualizada {activeQuote ? formatDate(activeQuote.updatedAt) : "sin fecha"}
+                  </p>
+                </div>
+                <Button type="button" variant="outline" className="rounded-2xl" onClick={() => setQuoteLibraryOpen(true)}>
+                  <FileJson className="h-4 w-4" />
+                  Ver guardadas
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
 
           <Section title="Información del cliente" description="Datos de contacto y referencia de la cotización." defaultOpen>
             <div className="grid gap-4 md:grid-cols-2">
@@ -553,6 +570,53 @@ export default function App() {
       </div>
 
       <PdfPreviewDialog open={previewOpen} onClose={() => setPreviewOpen(false)} pdfUrl={pdfUrl} />
+
+      {quoteLibraryOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-sm sm:items-center"
+          onClick={() => setQuoteLibraryOpen(false)}
+        >
+          <Card
+            className="max-h-[92dvh] w-full max-w-6xl overflow-hidden border-border shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <CardHeader className="flex-row items-start justify-between gap-4">
+              <div className="space-y-1">
+                <CardTitle className="text-base">Cotizaciones guardadas</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Reabre, duplica o borra una cotización sin cambiar el tamaño de la página.
+                </p>
+              </div>
+              <Button type="button" variant="outline" className="rounded-2xl" onClick={() => setQuoteLibraryOpen(false)}>
+                Cerrar
+              </Button>
+            </CardHeader>
+            <CardContent className="max-h-[calc(92dvh-120px)] overflow-y-auto">
+              <QuoteLibraryPanel
+                quotes={quotes}
+                activeQuoteId={activeQuote?.id ?? ""}
+                onSelect={(id) => {
+                  openQuote(id);
+                  setQuoteLibraryOpen(false);
+                }}
+                onNew={() => {
+                  createNewQuote();
+                  setQuoteLibraryOpen(false);
+                }}
+                onDuplicate={(id) => {
+                  const selectedQuote = quotes.find((quote) => quote.id === id);
+                  if (!selectedQuote) return;
+                  syncCurrentQuote();
+                  const duplicatedId = duplicateQuote(selectedQuote.values);
+                  setActiveQuoteId(duplicatedId);
+                  setStatus("Versión duplicada y abierta");
+                }}
+                onDelete={deleteQuoteById}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

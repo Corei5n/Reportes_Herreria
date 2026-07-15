@@ -1,30 +1,9 @@
 import { z } from "zod";
 import { nanoid } from "@/lib/nanoid";
 
-export const fixedExpenseCategories = [
-  "Vivienda",
-  "Servicios",
-  "Alimentación",
-  "Transporte",
-  "Educación",
-  "Salud",
-  "Suscripciones",
-  "Seguros",
-  "Deudas",
-  "Mascotas",
-  "Entretenimiento",
-  "Otros"
-] as const;
+export const fixedExpenseCategories = ["Servicios", "Créditos", "Gasolina", "Otros"] as const;
 
-export const fixedExpenseFrequencies = [
-  "Semanal",
-  "Quincenal",
-  "Mensual",
-  "Bimestral",
-  "Trimestral",
-  "Semestral",
-  "Anual"
-] as const;
+export const fixedExpenseFrequencies = ["Semanal", "Quincenal", "Mensual", "Bimestral", "Trimestral", "Semestral", "Anual"] as const;
 
 export type FixedExpenseCategoryOption = (typeof fixedExpenseCategories)[number];
 export type FixedExpenseFrequency = (typeof fixedExpenseFrequencies)[number];
@@ -59,6 +38,10 @@ const fromMonthlyFactors: Record<FixedExpenseFrequency, number> = {
   Anual: 12
 };
 
+function isFixedExpenseCategory(value: unknown): value is FixedExpenseCategoryOption {
+  return typeof value === "string" && (fixedExpenseCategories as readonly string[]).includes(value);
+}
+
 export function roundMoney(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -70,35 +53,6 @@ export function toMonthlyAmount(amount: number, frequency: FixedExpenseFrequency
 
 export function fromMonthlyAmount(monthlyAmount: number, frequency: FixedExpenseFrequency): number {
   return roundMoney(Number(monthlyAmount || 0) * fromMonthlyFactors[frequency]);
-}
-
-export function resolveExpenseCategory(expense: Pick<FixedExpenseItem, "categoria" | "categoriaPersonalizada"> | Partial<FixedExpenseItem>): string {
-  if (expense.categoria === "Otros") {
-    const custom = (expense.categoriaPersonalizada ?? "").trim();
-    return custom || "Otros";
-  }
-  return (expense.categoria ?? "Otros") as FixedExpenseCategoryOption;
-}
-
-export function createDefaultFixedExpense(): FixedExpenseItem {
-  return {
-    id: nanoid(),
-    concepto: "",
-    categoria: "Otros",
-    categoriaPersonalizada: "",
-    importe: undefined,
-    frecuencia: "Mensual",
-    fechaPago: "",
-    notas: ""
-  };
-}
-
-export function createDefaultFixedExpensesState(): FixedExpensesState {
-  return {
-    nombreDelHogar: "",
-    ingresoMensual: undefined,
-    gastos: []
-  };
 }
 
 export type FixedExpenseItem = {
@@ -117,6 +71,39 @@ export type FixedExpensesState = {
   ingresoMensual?: number;
   gastos: FixedExpenseItem[];
 };
+
+export function resolveExpenseCategory(expense: Pick<FixedExpenseItem, "categoria" | "categoriaPersonalizada"> | Partial<FixedExpenseItem>): string {
+  if (expense.categoria === "Otros") {
+    const custom = (expense.categoriaPersonalizada ?? "").trim();
+    return custom || "Otros";
+  }
+  return isFixedExpenseCategory(expense.categoria) ? expense.categoria : "Otros";
+}
+
+export function getPrimaryExpenseCategory(expense: Pick<FixedExpenseItem, "categoria"> | Partial<FixedExpenseItem>): FixedExpenseCategoryOption {
+  return isFixedExpenseCategory(expense.categoria) ? expense.categoria : "Otros";
+}
+
+export function createDefaultFixedExpense(category: FixedExpenseCategoryOption = "Otros"): FixedExpenseItem {
+  return {
+    id: nanoid(),
+    concepto: "",
+    categoria: category,
+    categoriaPersonalizada: "",
+    importe: undefined,
+    frecuencia: "Mensual",
+    fechaPago: "",
+    notas: ""
+  };
+}
+
+export function createDefaultFixedExpensesState(): FixedExpensesState {
+  return {
+    nombreDelHogar: "",
+    ingresoMensual: undefined,
+    gastos: []
+  };
+}
 
 export const fixedExpenseItemSchema = z
   .object({
@@ -184,6 +171,19 @@ function isBlankExpense(expense: Partial<FixedExpenseItem>): boolean {
   return concepto === "" && categoriaPersonalizada === "" && notas === "" && fechaPago === "" && roundMoney(importe) <= 0;
 }
 
+function normalizeCategoryAndCustom(expense: Partial<FixedExpenseItem>) {
+  const originalCategoria = typeof expense.categoria === "string" ? expense.categoria.trim() : "";
+  const categoria = isFixedExpenseCategory(originalCategoria) ? originalCategoria : "Otros";
+  const categoriaPersonalizada =
+    typeof expense.categoriaPersonalizada === "string" && expense.categoriaPersonalizada.trim()
+      ? expense.categoriaPersonalizada.trim()
+      : categoria === "Otros" && originalCategoria && originalCategoria !== "Otros"
+        ? originalCategoria
+        : "";
+
+  return { categoria, categoriaPersonalizada };
+}
+
 export function normalizeFixedExpensesState(value: unknown): FixedExpensesState {
   const fallback = createDefaultFixedExpensesState();
   if (!value || typeof value !== "object") return fallback;
@@ -193,9 +193,7 @@ export function normalizeFixedExpensesState(value: unknown): FixedExpensesState 
     ? raw.gastos
         .map((item) => {
           const expense = item as Partial<FixedExpenseItem>;
-          const categoria = fixedExpenseCategories.includes(expense.categoria as FixedExpenseCategoryOption)
-            ? (expense.categoria as FixedExpenseCategoryOption)
-            : "Otros";
+          const { categoria, categoriaPersonalizada } = normalizeCategoryAndCustom(expense);
           const frecuencia = fixedExpenseFrequencies.includes(expense.frecuencia as FixedExpenseFrequency)
             ? (expense.frecuencia as FixedExpenseFrequency)
             : "Mensual";
@@ -203,7 +201,7 @@ export function normalizeFixedExpensesState(value: unknown): FixedExpensesState 
             id: typeof expense.id === "string" && expense.id ? expense.id : nanoid(),
             concepto: typeof expense.concepto === "string" ? expense.concepto.trim() : "",
             categoria,
-            categoriaPersonalizada: typeof expense.categoriaPersonalizada === "string" ? expense.categoriaPersonalizada.trim() : "",
+            categoriaPersonalizada,
             importe: Number.isFinite(Number(expense.importe)) ? roundMoney(Number(expense.importe)) : undefined,
             frecuencia,
             fechaPago: typeof expense.fechaPago === "string" ? expense.fechaPago : "",
@@ -222,6 +220,24 @@ export function normalizeFixedExpensesState(value: unknown): FixedExpensesState 
   };
 }
 
+export function normalizeExpenseForForm(expense: Partial<FixedExpenseItem>): FixedExpenseItem {
+  const { categoria, categoriaPersonalizada } = normalizeCategoryAndCustom(expense);
+  const frecuencia = fixedExpenseFrequencies.includes(expense.frecuencia as FixedExpenseFrequency)
+    ? (expense.frecuencia as FixedExpenseFrequency)
+    : "Mensual";
+
+  return {
+    id: typeof expense.id === "string" && expense.id ? expense.id : nanoid(),
+    concepto: typeof expense.concepto === "string" ? expense.concepto : "",
+    categoria,
+    categoriaPersonalizada,
+    importe: Number.isFinite(Number(expense.importe)) ? roundMoney(Number(expense.importe)) : undefined,
+    frecuencia,
+    fechaPago: typeof expense.fechaPago === "string" ? expense.fechaPago : "",
+    notas: typeof expense.notas === "string" ? expense.notas : ""
+  };
+}
+
 export function getExpenseMonthlyEquivalent(expense: Pick<FixedExpenseItem, "importe" | "frecuencia"> | Partial<FixedExpenseItem>): number {
   return toMonthlyAmount(Number(expense.importe || 0), (expense.frecuencia ?? "Mensual") as FixedExpenseFrequency);
 }
@@ -232,26 +248,6 @@ export function getExpensePeriodEquivalent(
 ): number {
   const monthly = getExpenseMonthlyEquivalent(expense);
   return fromMonthlyAmount(monthly, target);
-}
-
-export function normalizeExpenseForForm(expense: Partial<FixedExpenseItem>): FixedExpenseItem {
-  const categoria = fixedExpenseCategories.includes(expense.categoria as FixedExpenseCategoryOption)
-    ? (expense.categoria as FixedExpenseCategoryOption)
-    : "Otros";
-  const frecuencia = fixedExpenseFrequencies.includes(expense.frecuencia as FixedExpenseFrequency)
-    ? (expense.frecuencia as FixedExpenseFrequency)
-    : "Mensual";
-
-  return {
-    id: typeof expense.id === "string" && expense.id ? expense.id : nanoid(),
-    concepto: typeof expense.concepto === "string" ? expense.concepto : "",
-    categoria,
-    categoriaPersonalizada: typeof expense.categoriaPersonalizada === "string" ? expense.categoriaPersonalizada : "",
-    importe: Number.isFinite(Number(expense.importe)) ? roundMoney(Number(expense.importe)) : undefined,
-    frecuencia,
-    fechaPago: typeof expense.fechaPago === "string" ? expense.fechaPago : "",
-    notas: typeof expense.notas === "string" ? expense.notas : ""
-  };
 }
 
 export type FixedExpenseSummary = {
@@ -280,8 +276,8 @@ export function calculateFixedExpenseSummary(values: FixedExpensesState): FixedE
     .map((expense) => ({
       ...expense,
       importe: Number(expense.importe || 0),
-      concepto: expense.concepto.trim(),
-      categoriaPersonalizada: expense.categoriaPersonalizada.trim(),
+      concepto: (expense.concepto ?? "").trim(),
+      categoriaPersonalizada: (expense.categoriaPersonalizada ?? "").trim(),
       categoria: expense.categoria
     }))
     .filter((expense) => expense.concepto || Number(expense.importe) > 0 || expense.categoriaPersonalizada);
@@ -294,9 +290,7 @@ export function calculateFixedExpenseSummary(values: FixedExpensesState): FixedE
   const annualTotal = roundMoney(fromMonthlyAmount(monthlyTotal, "Anual"));
   const count = normalizedExpenses.length;
   const averagePerExpense = count ? roundMoney(monthlyTotal / count) : 0;
-  const highestIndex = monthlyTotals.reduce((bestIndex, current, index, array) =>
-    current > array[bestIndex] ? index : bestIndex,
-  0);
+  const highestIndex = monthlyTotals.reduce((bestIndex, current, index, array) => (current > array[bestIndex] ? index : bestIndex), 0);
   const highestExpense = normalizedExpenses.length
     ? {
         concepto: normalizedExpenses[highestIndex].concepto || "Sin concepto",
@@ -307,7 +301,7 @@ export function calculateFixedExpenseSummary(values: FixedExpensesState): FixedE
 
   const categoryMap = new Map<string, number>();
   normalizedExpenses.forEach((expense) => {
-    const category = resolveExpenseCategory(expense);
+    const category = getPrimaryExpenseCategory(expense);
     categoryMap.set(category, roundMoney((categoryMap.get(category) ?? 0) + getExpenseMonthlyEquivalent(expense)));
   });
 

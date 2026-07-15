@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { formatCurrency, formatDate } from "@/lib/currency";
-import { calculateFixedExpenseSummary, resolveExpenseCategory, type FixedExpensesState } from "@/lib/fixed-expenses";
+import { calculateFixedExpenseSummary, type FixedExpensesState } from "@/lib/fixed-expenses";
 import { drawTableRow, rgbFromHex } from "@/pdf/pdf-utils";
 
 function formatPdfAmount(value: number): string {
@@ -136,27 +136,12 @@ export async function buildFixedExpensesPdf(values: FixedExpensesState): Promise
   });
   cursorY -= summaryBoxHeight + 18;
 
-  if (summary.categoryTotals.length) {
-    renderTable(
-      summary.categoryTotals.map((item) => [item.categoria, formatPdfAmount(item.total)]),
-      [340, 145],
-      "Totales por categoría",
-      ["Categoría", "Total mensual"]
-    );
-  }
-
   if (values.gastos.length) {
     renderTable(
-      values.gastos.map((item) => [
-        item.concepto,
-        resolveExpenseCategory(item),
-        item.frecuencia,
-        formatPdfAmount(Number(item.importe || 0)),
-        formatPdfAmount(summary.monthlyById[item.id] ?? 0)
-      ]),
-      [170, 110, 85, 95, 95],
+      values.gastos.map((item) => [item.concepto, item.frecuencia, formatPdfAmount(Number(item.importe || 0)), formatPdfAmount(summary.monthlyById[item.id] ?? 0)]),
+      [240, 90, 105, 90],
       "Tabla de gastos",
-      ["Concepto", "Categoría", "Frecuencia", "Importe", "Equiv. mensual"]
+      ["Concepto", "Frecuencia", "Importe", "Equiv. mensual"]
     );
   }
 

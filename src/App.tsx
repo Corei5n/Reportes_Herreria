@@ -126,6 +126,14 @@ export default function App() {
 
   const createPdfBlob = async (data: QuoteFormValues) => buildQuotePdf(data);
 
+  const changeSection = (section: "quotes" | "fixed-expenses") => {
+    syncCurrentQuote();
+    setActiveSection(section);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
   const addMaterial = () =>
     materialesArray.append({
       id: nanoid(),
@@ -286,8 +294,35 @@ export default function App() {
     await generatePdf(false, true);
   };
 
-  return activeSection === "quotes" ? (
+  return (
     <div className="min-h-full">
+      <div className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl gap-2 px-4 py-3 sm:px-6 lg:px-8">
+          <Button
+            type="button"
+            variant={activeSection === "quotes" ? "secondary" : "outline"}
+            className="rounded-2xl"
+            onClick={() => changeSection("quotes")}
+            aria-pressed={activeSection === "quotes"}
+          >
+            <Calculator className="h-4 w-4" />
+            Cotizaciones
+          </Button>
+          <Button
+            type="button"
+            variant={activeSection === "fixed-expenses" ? "secondary" : "outline"}
+            className="rounded-2xl"
+            onClick={() => changeSection("fixed-expenses")}
+            aria-pressed={activeSection === "fixed-expenses"}
+          >
+            <Wallet className="h-4 w-4" />
+            Gastos fijos
+          </Button>
+        </div>
+      </div>
+
+      {activeSection === "quotes" ? (
+        <div className="min-h-full">
       <header className="safe-top border-b border-border/60 bg-background/80 backdrop-blur-xl lg:sticky lg:top-0 lg:z-30">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -620,8 +655,10 @@ export default function App() {
           </Card>
         </div>
       ) : null}
+        </div>
+      ) : (
+        <FixedExpensesPanel onBackToQuotes={() => changeSection("quotes")} />
+      )}
     </div>
-  ) : (
-    <FixedExpensesPanel onBackToQuotes={() => setActiveSection("quotes")} />
   );
 }

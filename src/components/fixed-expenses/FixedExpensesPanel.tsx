@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useFieldArray, useForm, type FieldErrors, type Path, type Resolver, type UseFormRegister } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp, CopyPlus, Download, FileDown, Plus, RotateCcw, Trash2 } from "lucide-react";
@@ -18,6 +18,7 @@ import {
   getExpenseMonthlyEquivalent,
   normalizeExpenseForForm,
   normalizeFixedExpensesState,
+  roundMoney,
   type FixedExpenseFormValues,
   type FixedExpenseItem,
   type FixedExpenseSummary
@@ -79,6 +80,15 @@ function Stat({ label, value, emphasis = false }: { label: string; value: string
   );
 }
 
+function MiniStat({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
+  return (
+    <div className={cn("rounded-2xl border px-3 py-2", emphasis ? "border-primary/20 bg-primary/10" : "border-border bg-card")}>
+      <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 text-sm font-semibold sm:text-base", emphasis && "text-primary")}>{value}</p>
+    </div>
+  );
+}
+
 type FixedExpensesPanelProps = {
   onBackToQuotes?: () => void;
 };
@@ -109,11 +119,11 @@ function ExpenseRow({
   manualOrder: boolean;
 }) {
   return (
-    <Card className="overflow-hidden border-border/80">
-      <CardContent className="space-y-3 p-4">
-        <div className="grid gap-3 md:grid-cols-[1.4fr_0.7fr_0.8fr_1fr_auto] md:items-start">
+    <Card className="overflow-hidden border-border/80 shadow-sm">
+      <CardContent className="space-y-3 p-3 sm:p-4">
+        <div className="grid gap-3 md:grid-cols-[1.7fr_0.75fr_0.8fr_auto] md:items-end">
           <Field label="Concepto" error={errors.gastos?.[index]?.concepto?.message?.toString()} required>
-            <Input {...register(`gastos.${index}.concepto`)} placeholder="Ej. Renta" />
+            <Input {...register(`gastos.${index}.concepto`)} placeholder="Ej. Renta" autoComplete="off" />
           </Field>
           <Field label="Importe" error={errors.gastos?.[index]?.importe?.message?.toString()} required>
             <Input {...register(`gastos.${index}.importe`, { setValueAs: numberOrUndefined })} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00" />
@@ -130,10 +140,7 @@ function ExpenseRow({
               ))}
             </select>
           </Field>
-          <Field label="Notas" error={errors.gastos?.[index]?.notas?.message?.toString()}>
-            <Input {...register(`gastos.${index}.notas`)} placeholder="Opcional" />
-          </Field>
-          <div className="flex flex-wrap gap-2 pt-6 md:pt-7">
+          <div className="flex flex-wrap gap-2 md:justify-end">
             <Button type="button" variant="outline" size="icon" onClick={onMoveUp} disabled={!manualOrder || !canMoveUp} aria-label="Mover arriba">
               <ArrowUp className="h-4 w-4" />
             </Button>
@@ -148,8 +155,21 @@ function ExpenseRow({
             </Button>
           </div>
         </div>
-        <div className="rounded-2xl bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
-          Mensual estimado: <span className="font-semibold text-foreground">{formatCurrency(getExpenseMonthlyEquivalent(expense))}</span>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted/40 px-3 py-2 text-sm">
+          <span className="text-muted-foreground">
+            Mensual estimado: <span className="font-semibold text-foreground">{formatCurrency(getExpenseMonthlyEquivalent(expense))}</span>
+          </span>
+          <details className="group">
+            <summary className="cursor-pointer list-none rounded-full px-3 py-1 text-xs font-medium text-muted-foreground transition hover:bg-background">
+              Notas
+            </summary>
+            <div className="mt-3 min-w-[220px]">
+              <Field label="Notas" error={errors.gastos?.[index]?.notas?.message?.toString()}>
+                <Input {...register(`gastos.${index}.notas`)} placeholder="Opcional" />
+              </Field>
+            </div>
+          </details>
         </div>
       </CardContent>
     </Card>
@@ -167,6 +187,8 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
   const [quickFrequency, setQuickFrequency] = useState<FixedExpenseFormValues["gastos"][number]["frecuencia"]>("Mensual");
   const [manualOrder, setManualOrder] = useState(true);
   const lastSavedRef = useRef<string>("");
+  const quickConceptRef = useRef<HTMLInputElement | null>(null);
+  const quickAmountRef = useRef<HTMLInputElement | null>(null);
 
   const form = useForm<FixedExpenseFormValues>({
     resolver: zodResolver(fixedExpensesSchema) as Resolver<FixedExpenseFormValues>,
@@ -225,17 +247,36 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
 
   const addExpense = () => {
     const amount = numberOrUndefined(quickAmount);
-    if (!quickConcept.trim()) return;
+    if (!quickConcept.trim()) {
+      setStatus("Escribe el concepto del gasto.");
+      quickConceptRef.current?.focus();
+      return;
+    }
+    if (typeof amount !== "number" || amount <= 0) {
+      setStatus("Escribe un importe mayor que 0.");
+      quickAmountRef.current?.focus();
+      return;
+    }
+
     expenseArray.append({
       ...createDefaultFixedExpense(),
       concepto: quickConcept.trim(),
-      importe: amount,
+      importe: roundMoney(amount),
       frecuencia: quickFrequency
     });
+
     setQuickConcept("");
     setQuickAmount("");
     setQuickFrequency("Mensual");
     setStatus("Gasto agregado");
+    window.requestAnimationFrame(() => quickConceptRef.current?.focus());
+  };
+
+  const handleQuickKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addExpense();
+    }
   };
 
   const duplicateExpense = (index: number) => {
@@ -314,15 +355,26 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
   };
 
   const monthlyIncome = summary.ingresoMensual;
+  const balanceLabel =
+    typeof monthlyIncome === "number"
+      ? summary.estadoBalance === "positivo"
+        ? "Positivo"
+        : summary.estadoBalance === "cero"
+          ? "En cero"
+          : "Negativo"
+      : "Sin ingreso";
+
   return (
-    <div className="space-y-6">
-      <Card className="overflow-hidden">
-        <CardHeader className="space-y-2">
+    <div className="space-y-6 pb-28">
+      <Card className="sticky top-16 z-30 overflow-hidden border-border/80 shadow-sm">
+        <CardContent className="space-y-4 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-2">
-              <CardTitle className="text-xl">Gastos fijos</CardTitle>
-              <p className="max-w-3xl text-sm text-muted-foreground">Una lista simple para anotar gastos, ver el total al instante y guardar todo solo en este dispositivo.</p>
-              <p className="text-xs text-muted-foreground">Última acción: {status}</p>
+            <div className="space-y-1">
+              <CardTitle className="text-xl sm:text-2xl">Gastos fijos</CardTitle>
+              <p className="max-w-3xl text-sm text-muted-foreground">
+                Una lista rápida para capturar gastos como si fuera una compra: escribe, agrega y sigue bajando.
+              </p>
+              <p className="text-xs text-muted-foreground">Los datos se guardan solo en este dispositivo. Última acción: {status}</p>
             </div>
             {onBackToQuotes ? (
               <Button type="button" variant="outline" className="rounded-2xl" onClick={onBackToQuotes}>
@@ -330,19 +382,24 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
               </Button>
             ) : null}
           </div>
-        </CardHeader>
-      </Card>
 
-      <Card className="overflow-hidden">
-        <CardContent className="space-y-4 p-4">
-          <div className="grid gap-3 md:grid-cols-[1.4fr_0.7fr_0.8fr_auto]">
+          <div className="grid gap-3 md:grid-cols-[1.8fr_0.7fr_0.8fr_auto]">
             <Field label="Concepto" required>
-              <Input value={quickConcept} onChange={(event) => setQuickConcept(event.target.value)} placeholder="Ej. Renta, luz, gasolina" />
+              <Input
+                ref={quickConceptRef}
+                value={quickConcept}
+                onChange={(event) => setQuickConcept(event.target.value)}
+                onKeyDown={handleQuickKeyDown}
+                placeholder="Ej. Renta, luz, gasolina"
+                autoComplete="off"
+              />
             </Field>
             <Field label="Importe" required>
               <Input
+                ref={quickAmountRef}
                 value={quickAmount}
                 onChange={(event) => setQuickAmount(event.target.value)}
+                onKeyDown={handleQuickKeyDown}
                 type="number"
                 inputMode="decimal"
                 min="0"
@@ -364,37 +421,45 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
               </select>
             </Field>
             <div className="flex items-end">
-              <Button type="button" size="lg" className="w-full rounded-2xl" onClick={addExpense} disabled={!quickConcept.trim()}>
+              <Button type="button" size="lg" className="w-full rounded-2xl" onClick={addExpense}>
                 <Plus className="h-4 w-4" />
                 Agregar
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Field label="Ingreso mensual" className="min-w-[220px]">
-              <Input {...register("ingresoMensual", { setValueAs: numberOrUndefined })} type="number" min="0" step="0.01" inputMode="decimal" placeholder="Opcional" />
-            </Field>
-            <Field label="Nombre del hogar o usuario" className="min-w-[240px]">
-              <Input {...register("nombreDelHogar")} placeholder="Opcional" />
-            </Field>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <MiniStat label="Total mensual" value={formatCurrency(summary.monthlyTotal)} emphasis />
+            <MiniStat label="Gastos" value={String(summary.count)} />
+            <MiniStat label={typeof monthlyIncome === "number" ? "Dinero restante" : "Balance"} value={typeof monthlyIncome === "number" ? formatCurrency(summary.dineroRestante ?? 0) : balanceLabel} />
           </div>
+
+          <details className="rounded-2xl border border-border bg-background/70 px-3 py-2">
+            <summary className="cursor-pointer list-none text-sm font-medium">Opciones opcionales</summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Ingreso mensual" className="min-w-[220px]">
+                <Input {...register("ingresoMensual", { setValueAs: numberOrUndefined })} type="number" min="0" step="0.01" inputMode="decimal" placeholder="Opcional" />
+              </Field>
+              <Field label="Nombre del hogar o usuario" className="min-w-[240px]">
+                <Input {...register("nombreDelHogar")} placeholder="Opcional" />
+              </Field>
+            </div>
+          </details>
         </CardContent>
       </Card>
 
       <Card className="overflow-hidden">
-        <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
-          <Stat label="Total mensual" value={formatCurrency(summary.monthlyTotal)} emphasis />
+        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label="Total semanal" value={formatCurrency(summary.weeklyTotal)} />
           <Stat label="Total quincenal" value={formatCurrency(summary.biweeklyTotal)} />
           <Stat label="Total anual" value={formatCurrency(summary.annualTotal)} />
-          <Stat label="Gastos" value={String(summary.count)} />
           <Stat label="Promedio por gasto" value={formatCurrency(summary.averagePerExpense)} />
           <Stat label="Gasto más alto" value={summary.highestExpense ? formatCurrency(summary.highestExpense.monthly) : formatCurrency(0)} />
           <div className="rounded-2xl border border-border bg-card px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Estado del balance</p>
             <div className="mt-2 flex items-center justify-between gap-3">
               <BalanceBadge summary={summary} />
-              <span className="text-sm font-semibold">{typeof monthlyIncome === "number" ? (summary.estadoBalance === "positivo" ? "OK" : summary.estadoBalance === "cero" ? "Exacto" : "Negativo") : "Sin ingreso"}</span>
+              <span className="text-sm font-semibold">{balanceLabel}</span>
             </div>
           </div>
         </CardContent>
@@ -406,7 +471,7 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
             <Stat label="Ingreso mensual" value={formatCurrency(monthlyIncome)} />
             <Stat label="Dinero restante" value={formatCurrency(summary.dineroRestante ?? 0)} emphasis={typeof summary.dineroRestante === "number" && summary.dineroRestante >= 0} />
             <Stat label="% destinado a gastos" value={`${percentageFormatter.format(summary.porcentajeIngreso ?? 0)}%`} />
-            <Stat label="Balance" value={summary.estadoBalance === "positivo" ? "Positivo" : summary.estadoBalance === "cero" ? "En cero" : "Negativo"} />
+            <Stat label="Balance" value={balanceLabel} />
           </CardContent>
         </Card>
       ) : null}

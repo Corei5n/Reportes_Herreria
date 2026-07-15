@@ -26,6 +26,24 @@ export class AppErrorBoundary extends React.Component<Props, State> {
     window.location.reload();
   };
 
+  handleRepair = async () => {
+    try {
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+    } catch (error) {
+      console.error("No se pudo reparar la caché de la app:", error);
+    } finally {
+      window.location.reload();
+    }
+  };
+
   render() {
     if (this.state.error) {
       return (
@@ -47,6 +65,10 @@ export class AppErrorBoundary extends React.Component<Props, State> {
                 <Button type="button" className="rounded-2xl" onClick={this.handleReload}>
                   <RotateCcw className="h-4 w-4" />
                   Recargar
+                </Button>
+                <Button type="button" variant="outline" className="rounded-2xl" onClick={() => void this.handleRepair()}>
+                  <RotateCcw className="h-4 w-4" />
+                  Reparar app
                 </Button>
               </div>
             </CardContent>

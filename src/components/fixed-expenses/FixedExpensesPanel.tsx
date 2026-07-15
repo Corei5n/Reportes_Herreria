@@ -476,6 +476,51 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Lista de gastos</CardTitle>
+              <p className="text-sm text-muted-foreground">Cada gasto queda visible aquí con su nombre, importe y frecuencia.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="rounded-2xl" onClick={() => setManualOrder((current) => !current)}>
+                Orden {manualOrder ? "manual" : "por importe"}
+              </Button>
+              <Button type="button" variant="outline" className="rounded-2xl" onClick={clearAll}>
+                <RotateCcw className="h-4 w-4" />
+                Limpiar lista
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {rows.length ? (
+            rows.map((row) => (
+              <ExpenseRow
+                key={row.expense.id}
+                index={row.index}
+                expense={row.expense}
+                register={register}
+                errors={errors}
+                onDuplicate={() => duplicateExpense(row.index)}
+                onDelete={() => deleteExpense(row.index)}
+                onMoveUp={() => moveExpense(row.index, -1)}
+                onMoveDown={() => moveExpense(row.index, 1)}
+                canMoveUp={row.index > 0}
+                canMoveDown={row.index < rows.length - 1}
+                manualOrder={manualOrder}
+              />
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+              Todavía no tienes gastos. Escribe uno arriba y presiona <span className="font-semibold text-foreground">Agregar</span>.
+            </div>
+          )}
+          <div ref={listEndRef} />
+        </CardContent>
+      </Card>
+
       <Card className="overflow-hidden">
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
           <Stat label="Total semanal" value={formatCurrency(summary.weeklyTotal)} />

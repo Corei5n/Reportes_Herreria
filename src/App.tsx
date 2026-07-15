@@ -12,7 +12,8 @@ import {
   SunMedium,
   FileJson,
   ChevronDown,
-  ClipboardPaste
+  ClipboardPaste,
+  Wallet
 } from "lucide-react";
 import { Section } from "@/components/Section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,26 +40,13 @@ import { nanoid } from "@/lib/nanoid";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { normalizeQuoteValues } from "@/lib/quote-library";
-
-function findFirstErrorPath(value: unknown, prefix = ""): string | null {
-  if (!value || typeof value !== "object") return null;
-
-  const entries = Object.entries(value as Record<string, unknown>);
-  for (const [key, child] of entries) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (child && typeof child === "object" && "message" in child) {
-      return path;
-    }
-    const nested = findFirstErrorPath(child, path);
-    if (nested) return nested;
-  }
-
-  return null;
-}
+import { findFirstErrorPath } from "@/lib/form-errors";
+import { FixedExpensesPanel } from "@/components/fixed-expenses/FixedExpensesPanel";
 
 export default function App() {
   const { theme, isDark, toggleTheme } = useTheme();
   const { installed, ios, canPromptInstall, promptInstall } = useInstallPrompt();
+  const [activeSection, setActiveSection] = useState<"quotes" | "fixed-expenses">("quotes");
   const {
     quotes,
     activeQuote,
@@ -298,7 +286,7 @@ export default function App() {
     await generatePdf(false, true);
   };
 
-  return (
+  return activeSection === "quotes" ? (
     <div className="min-h-full">
       <header className="safe-top border-b border-border/60 bg-background/80 backdrop-blur-xl lg:sticky lg:top-0 lg:z-30">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
@@ -365,6 +353,18 @@ export default function App() {
               Cotizaciones guardadas
             </Button>
             <InstallPrompt installed={installed} ios={ios} canPromptInstall={canPromptInstall} onInstall={promptInstall} />
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-2xl"
+              onClick={() => {
+                syncCurrentQuote();
+                setActiveSection("fixed-expenses");
+              }}
+            >
+              <Wallet className="h-4 w-4" />
+              Gastos fijos
+            </Button>
           </div>
         </div>
       </header>
@@ -621,5 +621,7 @@ export default function App() {
         </div>
       ) : null}
     </div>
+  ) : (
+    <FixedExpensesPanel onBackToQuotes={() => setActiveSection("quotes")} />
   );
 }

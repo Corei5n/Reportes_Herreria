@@ -5,7 +5,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import "./index.css";
 import { registerSW } from "virtual:pwa-register";
 
-const APP_VERSION = "2026-07-15-5";
+const APP_VERSION = "2026-07-15-6";
 const APP_VERSION_KEY = "cotizador-mx-app-version";
 
 async function cleanupStaleCache() {

@@ -34,9 +34,10 @@ const percentageFormatter = new Intl.NumberFormat("es-MX", {
   maximumFractionDigits: 2
 });
 
-function numberOrUndefined(value: string): number | undefined {
-  if (value.trim() === "") return undefined;
-  const parsed = Number(value);
+function numberOrUndefined(value: unknown): number | undefined {
+  if (value === "" || value === null || value === undefined) return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  const parsed = Number(String(value).trim());
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 

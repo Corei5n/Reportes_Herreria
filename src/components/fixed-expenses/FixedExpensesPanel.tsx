@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useFieldArray, useForm, type FieldErrors, type Path, type Resolver, type UseFormRegister } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowDown, ArrowUp, CopyPlus, Download, FileDown, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CopyPlus, Download, FileDown, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
   normalizeExpenseForForm,
   normalizeFixedExpensesState,
   roundMoney,
+  resolveExpenseCategory,
   type FixedExpenseFormValues,
   type FixedExpenseItem,
   type FixedExpenseSummary
@@ -27,6 +28,7 @@ import { loadFixedExpensesState, persistFixedExpensesState } from "@/lib/fixed-e
 import { formatCurrency } from "@/lib/currency";
 import { nanoid } from "@/lib/nanoid";
 import { findFirstErrorPath } from "@/lib/form-errors";
+import { repairPwaApp } from "@/lib/pwa-update";
 import { cn } from "@/lib/cn";
 
 const percentageFormatter = new Intl.NumberFormat("es-MX", {
@@ -122,6 +124,21 @@ function ExpenseRow({
   return (
     <Card className="overflow-hidden border-border/80 shadow-sm">
       <CardContent className="space-y-3 p-3 sm:p-4">
+        <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/60 bg-background px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Gasto</p>
+            <p className="truncate text-base font-semibold sm:text-lg">{expense.concepto || "Gasto sin nombre"}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Mensual</p>
+            <p className="text-base font-bold text-primary sm:text-lg">{formatCurrency(getExpenseMonthlyEquivalent(expense))}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full bg-muted px-3 py-1 font-medium text-muted-foreground">{fixedExpenseFrequencyLabels[expense.frecuencia]}</span>
+          <span className="rounded-full bg-muted px-3 py-1 font-medium text-muted-foreground">{resolveExpenseCategory(expense)}</span>
+          {expense.fechaPago ? <span className="rounded-full bg-muted px-3 py-1 font-medium text-muted-foreground">Pago: {expense.fechaPago}</span> : null}
+        </div>
         <div className="grid gap-3 md:grid-cols-[1.7fr_0.75fr_0.8fr_auto] md:items-end">
           <Field label="Concepto" error={errors.gastos?.[index]?.concepto?.message?.toString()} required>
             <Input {...register(`gastos.${index}.concepto`)} placeholder="Ej. Renta" autoComplete="off" />
@@ -190,6 +207,7 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
   const lastSavedRef = useRef<string>("");
   const quickConceptRef = useRef<HTMLInputElement | null>(null);
   const quickAmountRef = useRef<HTMLInputElement | null>(null);
+  const listEndRef = useRef<HTMLDivElement | null>(null);
 
   const form = useForm<FixedExpenseFormValues>({
     resolver: zodResolver(fixedExpensesSchema) as Resolver<FixedExpenseFormValues>,
@@ -269,8 +287,11 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
     setQuickConcept("");
     setQuickAmount("");
     setQuickFrequency("Mensual");
-    setStatus("Gasto agregado");
-    window.requestAnimationFrame(() => quickConceptRef.current?.focus());
+    setStatus(`Agregado: ${quickConcept.trim()} (${formatCurrency(roundMoney(amount))})`);
+    window.requestAnimationFrame(() => {
+      quickConceptRef.current?.focus();
+      listEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    });
   };
 
   const handleQuickKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -378,9 +399,15 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
               <p className="text-xs text-muted-foreground">Los datos se guardan solo en este dispositivo. Última acción: {status}</p>
             </div>
             {onBackToQuotes ? (
-              <Button type="button" variant="outline" className="rounded-2xl" onClick={onBackToQuotes}>
-                Volver a cotizaciones
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="rounded-2xl" onClick={() => void repairPwaApp()}>
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar versión
+                </Button>
+                <Button type="button" variant="outline" className="rounded-2xl" onClick={onBackToQuotes}>
+                  Volver a cotizaciones
+                </Button>
+              </div>
             ) : null}
           </div>
 
@@ -518,6 +545,7 @@ export function FixedExpensesPanel({ onBackToQuotes }: FixedExpensesPanelProps) 
               Todavía no tienes gastos. Escribe uno arriba y presiona <span className="font-semibold text-foreground">Agregar</span>.
             </div>
           )}
+          <div ref={listEndRef} />
         </CardContent>
       </Card>
 

@@ -13,6 +13,7 @@ import {
   FileJson,
   ChevronDown,
   ClipboardPaste,
+  RefreshCw,
   Wallet
 } from "lucide-react";
 import { Section } from "@/components/Section";
@@ -42,6 +43,7 @@ import { InstallPrompt } from "@/components/InstallPrompt";
 import { normalizeQuoteValues } from "@/lib/quote-library";
 import { findFirstErrorPath } from "@/lib/form-errors";
 import { FixedExpensesPanel } from "@/components/fixed-expenses/FixedExpensesPanel";
+import { repairPwaApp } from "@/lib/pwa-update";
 
 export default function App() {
   const { theme, isDark, toggleTheme } = useTheme();
@@ -387,12 +389,16 @@ export default function App() {
               <FileJson className="h-4 w-4" />
               Cotizaciones guardadas
             </Button>
-            <InstallPrompt installed={installed} ios={ios} canPromptInstall={canPromptInstall} onInstall={promptInstall} />
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-2xl"
-              onClick={() => {
+              <InstallPrompt installed={installed} ios={ios} canPromptInstall={canPromptInstall} onInstall={promptInstall} />
+              <Button type="button" variant="outline" className="rounded-2xl" onClick={() => void repairPwaApp()}>
+                <RefreshCw className="h-4 w-4" />
+                Actualizar versión
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl"
+                onClick={() => {
                 syncCurrentQuote();
                 setActiveSection("fixed-expenses");
               }}

@@ -2,6 +2,7 @@ import React from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { repairPwaApp } from "@/lib/pwa-update";
 
 type Props = {
   children: React.ReactNode;
@@ -27,21 +28,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
   };
 
   handleRepair = async () => {
-    try {
-      if ("caches" in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((key) => caches.delete(key)));
-      }
-
-      if ("serviceWorker" in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((registration) => registration.unregister()));
-      }
-    } catch (error) {
-      console.error("No se pudo reparar la caché de la app:", error);
-    } finally {
-      window.location.reload();
-    }
+    await repairPwaApp();
   };
 
   render() {

@@ -144,14 +144,6 @@ export const fixedExpenseItemSchema = z
         message: "El importe debe ser mayor que 0."
       });
     }
-
-    if (hasAnyMeaningfulValue && value.categoria === "Otros" && !(value.categoriaPersonalizada ?? "").trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["categoriaPersonalizada"],
-        message: "Escribe una categoría personalizada."
-      });
-    }
   });
 
 export const fixedExpensesSchema = z.object({

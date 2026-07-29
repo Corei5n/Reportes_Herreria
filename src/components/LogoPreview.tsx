@@ -2,6 +2,7 @@ import { Upload } from "lucide-react";
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { COMPANY_PROFILE } from "@/lib/company-profile";
 
 type LogoPreviewProps = {
   logoDataUrl?: string;
@@ -15,15 +16,11 @@ export function LogoPreview({ logoDataUrl, onChange }: LogoPreviewProps) {
     <Card className="flex items-center justify-between gap-4 p-4">
       <div className="flex items-center gap-3">
         <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted">
-          {logoDataUrl ? (
-            <img src={logoDataUrl} alt="Logo de la empresa" className="h-full w-full object-contain" />
-          ) : (
-            <span className="text-xs font-semibold text-muted-foreground">Logo</span>
-          )}
+          <img src={logoDataUrl || COMPANY_PROFILE.logoUrl} alt="Logo de la empresa" className="h-full w-full object-contain" />
         </div>
         <div>
           <p className="font-semibold">Logo de la empresa</p>
-          <p className="text-sm text-muted-foreground">Se guarda localmente en este dispositivo.</p>
+          <p className="text-sm text-muted-foreground">Se guarda localmente en este dispositivo. Usa el logo de Herreria Moderna por defecto.</p>
         </div>
       </div>
       <div>

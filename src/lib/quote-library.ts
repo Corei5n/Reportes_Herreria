@@ -1,4 +1,5 @@
 import { createDefaultQuote } from "@/lib/defaults";
+import { COMPANY_PROFILE } from "@/lib/company-profile";
 import { generateQuoteFolio } from "@/lib/folio";
 import { nanoid } from "@/lib/nanoid";
 import { readJson, writeJson, removeKey } from "@/lib/storage";
@@ -25,15 +26,21 @@ function nowIso(): string {
 }
 
 export function normalizeQuoteValues(values: QuoteFormValues): QuoteFormValues {
+  const fallback = createDefaultQuote();
   return {
-    ...createDefaultQuote(),
+    ...fallback,
     ...values,
     empresa: values.empresa ?? "",
+    anticipoPorcentaje: values.anticipoPorcentaje ?? fallback.anticipoPorcentaje,
+    tiempoEntregaDias: values.tiempoEntregaDias ?? fallback.tiempoEntregaDias,
+    garantiaDias: values.garantiaDias ?? fallback.garantiaDias,
+    vigenciaDias: values.vigenciaDias ?? fallback.vigenciaDias,
     notas: values.notas ?? "",
+    obraDireccion: values.obraDireccion ?? "",
     logoDataUrl: values.logoDataUrl ?? "",
-    companiaNombre: values.companiaNombre ?? "",
-    companiaTelefono: values.companiaTelefono ?? "",
-    companiaDireccion: values.companiaDireccion ?? ""
+    companiaNombre: values.companiaNombre ?? COMPANY_PROFILE.name,
+    companiaTelefono: values.companiaTelefono ?? COMPANY_PROFILE.phone,
+    companiaDireccion: values.companiaDireccion ?? COMPANY_PROFILE.workshopAddress
   };
 }
 

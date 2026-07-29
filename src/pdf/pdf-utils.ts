@@ -51,7 +51,8 @@ export function drawTableRow(
   x: number,
   y: number,
   height: number,
-  fill?: ReturnType<typeof rgb>
+  fill?: ReturnType<typeof rgb>,
+  textColor: ReturnType<typeof rgb> = rgb(0.15, 0.18, 0.24)
 ) {
   let currentX = x;
   if (fill) {
@@ -61,16 +62,41 @@ export function drawTableRow(
     page.drawRectangle({ x: currentX, y: y - height + 2, width: widths[index], height, borderColor: rgb(0.86, 0.88, 0.92), borderWidth: 0.8 });
     page.drawText(column, {
       x: currentX + 6,
-      y: y - 14,
-      size: 8.2,
+      y: y - 13,
+      size: 8.0,
       font: index === 0 ? bold : font,
-      color: rgb(0.15, 0.18, 0.24)
+      color: textColor,
+      maxWidth: Math.max(10, widths[index] - 12),
+      lineHeight: 8.8
     });
     currentX += widths[index];
   });
 }
 
-export async function embedOptionalImage(pdf: PDFDocument, dataUrl: string) {
+async function fileToDataUrl(blob: Blob): Promise<string> {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("No se pudo leer la imagen."));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer la imagen."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function resolveImageDataUrl(source: string): Promise<string> {
+  if (source.startsWith("data:")) return source;
+  const response = await fetch(source);
+  if (!response.ok) throw new Error(`No se pudo cargar la imagen: ${source}`);
+  return await fileToDataUrl(await response.blob());
+}
+
+export async function embedOptionalImage(pdf: PDFDocument, dataUrlOrPath: string) {
+  const dataUrl = await resolveImageDataUrl(dataUrlOrPath);
   const base64 = dataUrl.split(",")[1];
   const mime = dataUrl.split(";")[0].split(":")[1];
   const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));

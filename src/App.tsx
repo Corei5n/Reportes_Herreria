@@ -31,7 +31,7 @@ import { quoteSchema, type QuoteFormValues } from "@/lib/quote-types";
 import { useTheme } from "@/hooks/useTheme";
 import { useQuoteLibrary } from "@/hooks/useQuoteLibrary";
 import { useDebouncedEffect } from "@/hooks/useDebouncedEffect";
-import { buildQuotePdf } from "@/pdf/buildQuotePdf";
+import { buildClientQuotePdf, buildWorkshopQuotePdf } from "@/pdf/buildQuotePdf";
 import { LogoPreview } from "@/components/LogoPreview";
 import { RowsEditor } from "@/components/quote/RowsEditor";
 import { SummaryCard } from "@/components/SummaryCard";
@@ -44,6 +44,13 @@ import { normalizeQuoteValues } from "@/lib/quote-library";
 import { findFirstErrorPath } from "@/lib/form-errors";
 import { FixedExpensesPanel } from "@/components/fixed-expenses/FixedExpensesPanel";
 import { repairPwaApp } from "@/lib/pwa-update";
+
+function numberOrUndefined(value: unknown): number | undefined {
+  if (value === "" || value === null || value === undefined) return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  const parsed = Number(String(value).trim());
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 export default function App() {
   const { theme, isDark, toggleTheme } = useTheme();
@@ -126,7 +133,11 @@ export default function App() {
     };
   }, [quoteLibraryOpen]);
 
-  const createPdfBlob = async (data: QuoteFormValues) => buildQuotePdf(data);
+  type PdfMode = "workshop" | "client";
+
+  const createPdfBlob = async (data: QuoteFormValues, mode: PdfMode) => {
+    return mode === "client" ? buildClientQuotePdf(data) : buildWorkshopQuotePdf(data);
+  };
 
   const changeSection = (section: "quotes" | "fixed-expenses") => {
     syncCurrentQuote();
@@ -223,7 +234,7 @@ export default function App() {
     setStatus("Cotización importada");
   };
 
-  const generatePdf = async (download = true, preview = true) => {
+  const generatePdf = async (download = true, preview = true, mode: PdfMode = "workshop") => {
     const isFormValid = await trigger();
     if (!isFormValid) {
       const firstErrorPath = findFirstErrorPath(formState.errors);
@@ -243,7 +254,7 @@ export default function App() {
       const data = getValues();
       syncCurrentQuote();
       setStatus("Generando PDF...");
-      const blob = await createPdfBlob(data);
+      const blob = await createPdfBlob(data, mode);
 
       if (pdfUrl) URL.revokeObjectURL(pdfUrl);
       const url = URL.createObjectURL(blob);
@@ -253,7 +264,7 @@ export default function App() {
       if (download) {
         const a = document.createElement("a");
         a.href = url;
-        a.download = `cotizacion-${data.numeroCotizacion}.pdf`;
+        a.download = `cotizacion-${data.numeroCotizacion}-${mode}.pdf`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -292,8 +303,8 @@ export default function App() {
     }
   };
 
-  const openPreview = async () => {
-    await generatePdf(false, true);
+  const openPreview = async (mode: PdfMode = "workshop") => {
+    await generatePdf(false, true, mode);
   };
 
   return (
@@ -454,6 +465,9 @@ export default function App() {
               <Field label="Nombre del proyecto" error={errors.nombreProyecto?.message?.toString()} required>
                 <Input {...register("nombreProyecto")} placeholder="Ej. Fabricación de gabinete metálico" />
               </Field>
+              <Field label="Dirección de la obra" error={errors.obraDireccion?.message?.toString()}>
+                <Input {...register("obraDireccion")} placeholder="Dirección donde se realizará el trabajo" />
+              </Field>
               <Field label="Descripción" error={errors.descripcionProyecto?.message?.toString()} required>
                 <Textarea {...register("descripcionProyecto")} placeholder="Describe alcance, materiales o consideraciones especiales." />
               </Field>
@@ -524,7 +538,7 @@ export default function App() {
             </div>
           </Section>
 
-          <Section title="Marca y notas" description="Opcional. Se incluirá en el PDF." defaultOpen={false}>
+          <Section title="Marca y notas" description="Opcional. Se incluirá en el PDF." defaultOpen>
             <div className="space-y-4">
               <LogoPreview logoDataUrl={values.logoDataUrl} onChange={(value) => setValue("logoDataUrl", value, { shouldDirty: true })} />
               <div className="grid gap-4 md:grid-cols-2">
@@ -534,8 +548,22 @@ export default function App() {
                 <Field label="Teléfono / WhatsApp" error={errors.companiaTelefono?.message?.toString()}>
                   <Input {...register("companiaTelefono")} placeholder="55 0000 0000" />
                 </Field>
-                <Field label="Dirección" error={errors.companiaDireccion?.message?.toString()}>
-                  <Input {...register("companiaDireccion")} placeholder="Dirección fiscal o comercial" />
+                <Field label="Dirección del taller" error={errors.companiaDireccion?.message?.toString()}>
+                  <Input {...register("companiaDireccion")} placeholder="Dirección del taller" />
+                </Field>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Anticipo %" error={errors.anticipoPorcentaje?.message?.toString()} hint="Porcentaje del total que el cliente adelanta.">
+                  <Input {...register("anticipoPorcentaje", { setValueAs: numberOrUndefined })} type="number" min="0" step="1" inputMode="numeric" placeholder="50" />
+                </Field>
+                <Field label="Tiempo de entrega (días)" error={errors.tiempoEntregaDias?.message?.toString()} hint="Cuántos días tardará el trabajo.">
+                  <Input {...register("tiempoEntregaDias", { setValueAs: numberOrUndefined })} type="number" min="0" step="1" inputMode="numeric" placeholder="7" />
+                </Field>
+                <Field label="Garantía (días)" error={errors.garantiaDias?.message?.toString()} hint="Días de garantía de soldadura y estructura.">
+                  <Input {...register("garantiaDias", { setValueAs: numberOrUndefined })} type="number" min="0" step="1" inputMode="numeric" placeholder="30" />
+                </Field>
+                <Field label="Vigencia (días)" error={errors.vigenciaDias?.message?.toString()} hint="Cuánto dura vigente la cotización.">
+                  <Input {...register("vigenciaDias", { setValueAs: numberOrUndefined })} type="number" min="0" step="1" inputMode="numeric" placeholder="15" />
                 </Field>
               </div>
               <Field label="Notas" error={errors.notas?.message?.toString()} hint="Aclaraciones, tiempos de entrega, vigencia o términos especiales.">
@@ -546,13 +574,17 @@ export default function App() {
 
           <Section title="Generar PDF" description="Descarga y vista previa del documento profesional." defaultOpen>
             <div className="flex flex-wrap gap-3">
-              <Button type="button" size="lg" onClick={() => void generatePdf(true)} className="rounded-2xl" disabled={isGeneratingPdf}>
-                <FileDown className="h-4 w-4" />
-                {isGeneratingPdf ? "Generando..." : "Generar PDF"}
-              </Button>
-              <Button type="button" size="lg" variant="outline" onClick={() => void openPreview()} className="rounded-2xl" disabled={isGeneratingPdf}>
+              <Button type="button" size="lg" onClick={() => void openPreview("workshop")} className="rounded-2xl" disabled={isGeneratingPdf}>
                 <Download className="h-4 w-4" />
-                Vista previa
+                Vista previa taller
+              </Button>
+              <Button type="button" size="lg" onClick={() => void generatePdf(true, true, "workshop")} className="rounded-2xl" disabled={isGeneratingPdf}>
+                <FileDown className="h-4 w-4" />
+                {isGeneratingPdf ? "Generando..." : "PDF taller"}
+              </Button>
+              <Button type="button" size="lg" variant="outline" onClick={() => void generatePdf(true, true, "client")} className="rounded-2xl" disabled={isGeneratingPdf}>
+                <Download className="h-4 w-4" />
+                PDF cliente
               </Button>
               <Button type="button" size="lg" variant="secondary" onClick={() => window.print()} className="rounded-2xl">
                 <Save className="h-4 w-4" />
@@ -563,7 +595,7 @@ export default function App() {
         </div>
 
         <div className="space-y-4">
-          <SummaryCard totals={totals} onGeneratePdf={() => void generatePdf(true)} className="lg:sticky lg:top-28" />
+          <SummaryCard totals={totals} onGeneratePdf={() => void generatePdf(true, true, "workshop")} className="lg:sticky lg:top-28" />
 
           <Card>
             <CardHeader>
@@ -601,13 +633,17 @@ export default function App() {
             <p className="text-xl font-bold">{formatCurrency(totals.precioFinal)}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="rounded-2xl" onClick={() => void openPreview()} disabled={isGeneratingPdf}>
+            <Button variant="outline" className="rounded-2xl" onClick={() => void openPreview("workshop")} disabled={isGeneratingPdf}>
               <ChevronDown className="h-4 w-4 rotate-180" />
-              Vista previa
+              Vista previa taller
             </Button>
-            <Button className="rounded-2xl px-6" onClick={() => void generatePdf(true)} disabled={isGeneratingPdf}>
+            <Button variant="outline" className="rounded-2xl px-4" onClick={() => void generatePdf(true, true, "client")} disabled={isGeneratingPdf}>
               <FileDown className="h-4 w-4" />
-              Generar PDF
+              PDF cliente
+            </Button>
+            <Button className="rounded-2xl px-6" onClick={() => void generatePdf(true, true, "workshop")} disabled={isGeneratingPdf}>
+              <FileDown className="h-4 w-4" />
+              PDF taller
             </Button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { type QuoteFormValues } from "./quote-types";
 import { nanoid } from "./nanoid";
 import { generateQuoteFolio } from "./folio";
+import { COMPANY_PROFILE } from "./company-profile";
 
 export function createDefaultQuote(): QuoteFormValues {
   const today = new Date();
@@ -32,11 +33,16 @@ export function createDefaultQuote(): QuoteFormValues {
     gastosAdicionales: [],
     margenGanancia: 20,
     descuento: 0,
-    ivaActivo: false,
+    ivaActivo: true,
+    anticipoPorcentaje: 50,
+    tiempoEntregaDias: 7,
+    garantiaDias: 30,
+    vigenciaDias: 15,
     notas: "",
-    companiaNombre: "Tu empresa",
-    companiaTelefono: "",
-    companiaDireccion: "",
+    companiaNombre: COMPANY_PROFILE.name,
+    companiaTelefono: COMPANY_PROFILE.phone,
+    companiaDireccion: COMPANY_PROFILE.workshopAddress,
+    obraDireccion: "",
     logoDataUrl: ""
   };
 }

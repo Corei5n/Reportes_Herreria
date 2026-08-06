@@ -1,9 +1,9 @@
 export const COMPANY_PROFILE = {
-  name: "Herreria Moderna",
+  name: "Proyectos de Metal",
   phone: "777 5093569",
   email: "herreriamoderna2010@gmail.com",
-  owner: "René Carvajal Adame",
-  logoUrl: "/logo_herreria_moderna.png",
+  owner: "RenÃ© Carvajal Adame",
+  logoUrl: "/logo_pm.png",
   workshopAddress: "Calle Empleado Municipal, Oaxtepec Esquina, Martires de Rio Blanco, 62398 Cuernavaca, Mor.",
-  categoryLine: "Herrería · Estructuras · Herrería artística"
+  categoryLine: "DiseÃ±o Â· FabricaciÃ³n Â· InstalaciÃ³n"
 } as const;

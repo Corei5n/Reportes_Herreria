@@ -24,7 +24,7 @@ export const expenseItemSchema = z.object({
 export const quoteSchema = z.object({
   cliente: z.string().trim().min(1, "Escribe el nombre del cliente."),
   empresa: z.string().trim().optional().or(z.literal("")),
-  telefono: z.string().trim().min(1, "Escribe un teléfono."),
+  telefono: z.string().trim().optional().or(z.literal("")),
   correo: z.string().trim().email("Escribe un correo válido.").optional().or(z.literal("")),
   fecha: z.string().min(1, "Selecciona una fecha."),
   numeroCotizacion: z.string().trim().min(1, "Escribe un número de cotización."),

@@ -25,22 +25,35 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function textOrFallback(value: string | null | undefined, fallback: string): string {
+  const trimmed = (value ?? "").trim();
+  return trimmed || fallback;
+}
+
+function companyNameOrFallback(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return COMPANY_PROFILE.name;
+  if (trimmed.toLowerCase() === "herreria moderna") return COMPANY_PROFILE.name;
+  return trimmed;
+}
+
 export function normalizeQuoteValues(values: QuoteFormValues): QuoteFormValues {
   const fallback = createDefaultQuote();
   return {
     ...fallback,
     ...values,
-    empresa: values.empresa ?? "",
+    empresa: textOrFallback(values.empresa, ""),
     anticipoPorcentaje: values.anticipoPorcentaje ?? fallback.anticipoPorcentaje,
     tiempoEntregaDias: values.tiempoEntregaDias ?? fallback.tiempoEntregaDias,
     garantiaDias: values.garantiaDias ?? fallback.garantiaDias,
     vigenciaDias: values.vigenciaDias ?? fallback.vigenciaDias,
-    notas: values.notas ?? "",
-    obraDireccion: values.obraDireccion ?? "",
+    notas: textOrFallback(values.notas, ""),
+    obraDireccion: textOrFallback(values.obraDireccion, ""),
     logoDataUrl: values.logoDataUrl ?? "",
-    companiaNombre: values.companiaNombre ?? COMPANY_PROFILE.name,
-    companiaTelefono: values.companiaTelefono ?? COMPANY_PROFILE.phone,
-    companiaDireccion: values.companiaDireccion ?? COMPANY_PROFILE.workshopAddress
+    companiaNombre: companyNameOrFallback(values.companiaNombre),
+    companiaTelefono: textOrFallback(values.companiaTelefono, COMPANY_PROFILE.phone),
+    companiaDireccion: textOrFallback(values.companiaDireccion, COMPANY_PROFILE.workshopAddress),
+    ivaActivo: typeof values.ivaActivo === "boolean" ? values.ivaActivo : fallback.ivaActivo
   };
 }
 

@@ -448,7 +448,7 @@ export default function App() {
               <Field label="Empresa" error={errors.empresa?.message?.toString()}>
                 <Input {...register("empresa")} placeholder="Nombre de la empresa" />
               </Field>
-              <Field label="Teléfono" error={errors.telefono?.message?.toString()} required>
+              <Field label="Teléfono" error={errors.telefono?.message?.toString()}>
                 <Input {...register("telefono")} inputMode="tel" placeholder="55 1234 5678" />
               </Field>
               <Field label="Fecha" error={errors.fecha?.message?.toString()} required>

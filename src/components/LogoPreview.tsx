@@ -20,7 +20,7 @@ export function LogoPreview({ logoDataUrl, onChange }: LogoPreviewProps) {
         </div>
         <div>
           <p className="font-semibold">Logo de la empresa</p>
-          <p className="text-sm text-muted-foreground">Se guarda localmente en este dispositivo. Usa el logo de Herreria Moderna por defecto.</p>
+          <p className="text-sm text-muted-foreground">Se guarda localmente en este dispositivo. Usa el logo de Proyectos de Metal por defecto.</p>
         </div>
       </div>
       <div>
